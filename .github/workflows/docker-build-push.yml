@@ -1,11 +1,13 @@
-name: Docker Build and Push
+name: Docker Build, Test and Push
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, master, cinema ]
     paths:
       - 'src/**'
+      - 'tests/**'
+      - 'docker-compose.yml'
       - '.github/workflows/docker-build-push.yml'
   release:
     types: [published]
@@ -18,7 +20,7 @@ env:
   PROXY_SERVICE_IMAGE_NAME: ${{ github.repository }}/proxy-service
 
 jobs:
-  build-and-push:
+  build-test-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,32 +28,70 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start local stack for API tests
+        run: |
+          docker compose up --build -d
+          echo "Waiting for services..."
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null \
+              && curl -fsS http://127.0.0.1:8081/api/movies/health >/dev/null \
+              && curl -fsS http://127.0.0.1:8082/api/events/health >/dev/null; then
+              echo "Services are ready"
+              exit 0
+            fi
+            docker compose ps
+            sleep 5
+          done
+          docker compose logs
+          exit 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: tests/postman/package-lock.json
+
+      - name: Install Newman dependencies
+        working-directory: tests/postman
+        run: npm ci
+
+      - name: Run Postman API tests
+        working-directory: tests/postman
+        run: npm run test:local -- --reporters cli,junit
+
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop local stack
+        if: always()
+        run: docker compose down -v
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Monolith
+      - name: Extract metadata for Monolith
         id: meta-monolith
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.MONOLITH_IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
             type=ref,event=branch
-            latest
+            type=raw,value=latest
 
-      - name: Build and push Monolith Docker image
-        uses: docker/build-push-action@v4
+      - name: Build and push Monolith image
+        uses: docker/build-push-action@v5
         with:
           context: ./src/monolith
           push: true
@@ -60,20 +100,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Extract metadata (tags, labels) for Movies Service
+      - name: Extract metadata for Movies Service
         id: meta-movies
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.MOVIES_SERVICE_IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
             type=ref,event=branch
-            latest
+            type=raw,value=latest
 
-      - name: Build and push Movies Service Docker image
-        uses: docker/build-push-action@v4
+      - name: Build and push Movies Service image
+        uses: docker/build-push-action@v5
         with:
           context: ./src/microservices/movies
           push: true
@@ -82,4 +120,42 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      
+      - name: Extract metadata for Events Service
+        id: meta-events
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.EVENTS_SERVICE_IMAGE_NAME }}
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            type=raw,value=latest
+
+      - name: Build and push Events Service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/microservices/events
+          push: true
+          tags: ${{ steps.meta-events.outputs.tags }}
+          labels: ${{ steps.meta-events.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Proxy Service
+        id: meta-proxy
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.PROXY_SERVICE_IMAGE_NAME }}
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            type=raw,value=latest
+
+      - name: Build and push Proxy Service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/microservices/proxy
+          push: true
+          tags: ${{ steps.meta-proxy.outputs.tags }}
+          labels: ${{ steps.meta-proxy.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

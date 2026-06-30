@@ -5,7 +5,7 @@ global:
 
 # Image pull secrets
 imagePullSecrets:
-  dockerconfigjson: ewoJImF1dGhzIjogewoJCSJnaGNyLmlvIjogewoJCQkiYXV0aCI6
+  dockerconfigjson: eyJhdXRocyI6e319Cg==
 # Database configuration
 database:
   host: postgres
@@ -183,3 +183,4 @@ config:
   # Strangler Fig configuration
   gradualMigration: "true"
   moviesMigrationPercent: "100"
+  kafkaBrokers: "kafka:9092"

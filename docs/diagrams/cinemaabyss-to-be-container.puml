@@ -1,0 +1,65 @@
+@startuml CinemaAbyss_ToBe_Containers
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title CinemaAbyss To-Be Container Diagram
+
+Person(customer, "Пользователь", "Смотрит фильмы, управляет подпиской, ставит оценки и добавляет фильмы в избранное")
+Person(admin, "Операторы и маркетинг", "Управляют контентом, скидками и маркетинговыми кампаниями")
+
+System_Ext(recommendations, "Внешняя рекомендательная система", "Подборки и персональные рекомендации")
+System_Ext(payment_provider, "Платёжные системы", "Оплата подписок")
+System_Ext(loyalty, "Сервисы лояльности/маркетплейсы", "Скидки и промокампании")
+
+System_Boundary(cinema, "Кинобездна") {
+  Container(api_gateway, "Proxy / API Gateway", "Go, REST", "Единая точка входа. Реализует Strangler Fig, feature flag MOVIES_MIGRATION_PERCENT, маршрутизацию и ACL к монолиту")
+  Container(bff_mobile, "Mobile BFF", "REST/JSON", "Адаптирует ответы под мобильные устройства")
+  Container(bff_tv, "Smart TV BFF", "REST/JSON", "Адаптирует ответы под Smart TV")
+  Container(bff_web, "Web BFF", "REST/JSON", "Адаптирует ответы под веб-клиент")
+
+  Container(monolith, "Legacy Monolith", "Go", "Существующая логика пользователей, платежей, подписок, скидок и части видеокаталога до миграции")
+  Container(movies, "Movies Metadata Service", "Go", "Метаданные фильмов: жанры, актёры, рейтинги, описание, поиск")
+  Container(events, "Events Service", "Go", "MVP событийной интеграции: User/Payment/Movie events через Kafka")
+  Container(users, "User Service", "Go", "Целевой сервис пользователей, профилей, избранного и оценок")
+  Container(billing, "Billing Service", "Go", "Платежи, подписки, история операций, интеграция с провайдерами")
+  Container(content, "Content Access Service", "Go", "Проверка прав на просмотр, доступность контента, интеграция с источниками")
+
+  ContainerDb(postgres_legacy, "Legacy PostgreSQL", "PostgreSQL", "Текущая общая БД монолита на период миграции")
+  ContainerDb(movies_db, "Movies DB", "PostgreSQL", "Владение данными домена Movies")
+  ContainerDb(users_db, "Users DB", "PostgreSQL", "Владение пользовательскими данными")
+  ContainerDb(billing_db, "Billing DB", "PostgreSQL", "Владение платежами и подписками")
+  ContainerQueue(kafka, "Kafka", "Kafka", "Асинхронная интеграция, события доменов, основа для дальнейшего развития")
+}
+
+Rel(customer, bff_mobile, "Использует", "HTTPS")
+Rel(customer, bff_tv, "Использует", "HTTPS")
+Rel(customer, bff_web, "Использует", "HTTPS")
+Rel(admin, bff_web, "Администрирует", "HTTPS")
+
+Rel(bff_mobile, api_gateway, "Вызывает API", "REST")
+Rel(bff_tv, api_gateway, "Вызывает API", "REST")
+Rel(bff_web, api_gateway, "Вызывает API", "REST")
+
+Rel(api_gateway, movies, "Маршрутизирует /api/movies по feature flag", "REST")
+Rel(api_gateway, monolith, "Маршрутизирует legacy API", "REST")
+Rel(api_gateway, events, "Маршрутизирует /api/events", "REST")
+Rel(api_gateway, users, "Целевой маршрут /api/users", "REST")
+Rel(api_gateway, billing, "Целевой маршрут /api/payments и /api/subscriptions", "REST")
+Rel(api_gateway, content, "Целевой маршрут /api/content", "REST")
+
+Rel(monolith, postgres_legacy, "Читает/пишет", "SQL")
+Rel(movies, movies_db, "Читает/пишет", "SQL")
+Rel(users, users_db, "Читает/пишет", "SQL")
+Rel(billing, billing_db, "Читает/пишет", "SQL")
+Rel(events, kafka, "Публикует и читает события", "Kafka")
+Rel(movies, kafka, "Публикует Movie events", "Kafka")
+Rel(users, kafka, "Публикует User events", "Kafka")
+Rel(billing, kafka, "Публикует Payment events", "Kafka")
+
+Rel(billing, payment_provider, "Проводит платежи", "HTTPS")
+Rel(billing, loyalty, "Применяет скидки", "HTTPS")
+Rel(content, recommendations, "Получает рекомендации", "HTTPS/Async")
+Rel(users, recommendations, "Передаёт обезличенные события", "Kafka/API")
+
+@enduml
