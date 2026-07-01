@@ -22,8 +22,8 @@ spec:
     spec:
       containers:
       - name: proxy-service
-        image: ghcr.io/db-exp/cinemaabysstest/proxy-service:latest
-        imagePullPolicy: Always
+        image: proxy-service:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
         env:
@@ -74,8 +74,6 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
       restartPolicy: Always
-      imagePullSecrets:
-        - name: dockerconfigjson
 ---
 apiVersion: v1
 kind: Service

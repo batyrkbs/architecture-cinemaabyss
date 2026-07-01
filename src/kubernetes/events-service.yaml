@@ -22,8 +22,8 @@ spec:
     spec:
       containers:
       - name: events-service
-        image: ghcr.io/db-exp/cinemaabysstest/events-service:latest
-        imagePullPolicy: Always
+        image: events-service:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
         env:
@@ -54,8 +54,6 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
       restartPolicy: Always
-      imagePullSecrets:
-        - name: dockerconfigjson
 ---
 apiVersion: v1
 kind: Service

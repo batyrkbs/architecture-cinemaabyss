@@ -167,7 +167,6 @@ docker compose logs -f events-service
 kubectl apply -f src/kubernetes/namespace.yaml
 kubectl apply -f src/kubernetes/configmap.yaml
 kubectl apply -f src/kubernetes/secret.yaml
-kubectl apply -f src/kubernetes/dockerconfigsecret.yaml
 kubectl apply -f src/kubernetes/postgres-init-configmap.yaml
 kubectl apply -f src/kubernetes/postgres.yaml
 kubectl apply -f src/kubernetes/kafka/kafka.yaml
@@ -195,7 +194,43 @@ curl -X POST http://cinemaabyss.example.com/api/events/movie \
 kubectl -n cinemaabyss logs deploy/events-service
 ```
 
-Перед деплоем в свой кластер нужно заменить `ghcr.io/db-exp/cinemaabysstest/...` на путь к образам своего GitHub-репозитория, если репозиторий называется иначе.
+Events-сервис теперь пишет сообщения в настоящий Kafka через producer и читает их обратно через consumer group. Поэтому после POST-запросов в Kafka UI должны увеличиваться `Number of messages` в топиках `movie-events`, `user-events`, `payment-events`.
+
+В Kubernetes-манифестах используются локальные образы `monolith:latest`, `movies-service:latest`, `proxy-service:latest`, `events-service:latest` и `imagePullPolicy: IfNotPresent`, поэтому ревьюеру не нужен приватный token к GHCR.
+
+Для Minikube перед деплоем нужно собрать или загрузить образы в Minikube:
+
+```bash
+eval $(minikube docker-env)
+docker build -t monolith:latest ./src/monolith
+docker build -t movies-service:latest ./src/microservices/movies
+docker build -t proxy-service:latest ./src/microservices/proxy
+docker build -t events-service:latest ./src/microservices/events
+```
+
+Или одной командой из корня проекта:
+
+```bash
+./scripts/build-local-images.sh
+```
+
+Для Windows PowerShell можно использовать:
+
+```powershell
+minikube docker-env | Invoke-Expression
+docker build -t monolith:latest ./src/monolith
+docker build -t movies-service:latest ./src/microservices/movies
+docker build -t proxy-service:latest ./src/microservices/proxy
+docker build -t events-service:latest ./src/microservices/events
+```
+
+Или одной командой из корня проекта:
+
+```bash
+./scripts/build-local-images.sh
+```
+
+Если используется публичный GitHub Container Registry, значения образов можно переопределить в `src/kubernetes/helm/values.yaml` или через `helm install --set ...`.
 
 ## Задание 4. Helm-чарт
 
