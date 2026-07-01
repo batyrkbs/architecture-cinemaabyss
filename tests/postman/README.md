@@ -87,7 +87,7 @@ Options:
 - `--environment`, `-e`: Environment to run tests against (default: 'local')
 - `--collection`, `-c`: Collection to run (default: 'CinemaAbyss')
 - `--folder`, `-f`: Specific folder in the collection to run
-- `--reporters`, `-r`: Reporters to use, comma-separated (default: 'cli,htmlextra,junit')
+- `--reporters`, `-r`: Reporters to use, comma-separated (default: 'cli,junit')
 - `--bail`, `-b`: Stop on first error (default: false)
 - `--timeout`, `-t`: Request timeout in ms (default: 10000)
 

@@ -8,6 +8,33 @@ This Helm chart deploys the CinemaAbyss application on a Kubernetes cluster.
 - Helm 3.0+
 - PV provisioner support in the underlying infrastructure (if persistence is enabled)
 
+
+## Local image mode
+
+By default the chart uses local images: `monolith:latest`, `movies-service:latest`, `proxy-service:latest`, `events-service:latest` with `imagePullPolicy: IfNotPresent`. This avoids private GHCR access errors during review.
+
+For Minikube build images inside Minikube before `helm install`:
+
+```bash
+eval $(minikube docker-env)
+docker build -t monolith:latest ./src/monolith
+docker build -t movies-service:latest ./src/microservices/movies
+docker build -t proxy-service:latest ./src/microservices/proxy
+docker build -t events-service:latest ./src/microservices/events
+```
+
+For PowerShell:
+
+```powershell
+minikube docker-env | Invoke-Expression
+docker build -t monolith:latest ./src/monolith
+docker build -t movies-service:latest ./src/microservices/movies
+docker build -t proxy-service:latest ./src/microservices/proxy
+docker build -t events-service:latest ./src/microservices/events
+```
+
+If you use a private registry, set repositories in `values.yaml` and enable `imagePullSecrets.enabled`.
+
 ## Installing the Chart
 
 To install the chart with the release name `cinemaabyss`:
@@ -60,9 +87,9 @@ helm uninstall cinemaabyss
 | Name                           | Description                                     | Value           |
 |--------------------------------|-------------------------------------------------|-----------------|
 | `monolith.enabled`             | Enable monolith deployment                      | `true`          |
-| `monolith.image.repository`    | Monolith image repository                       | `ghcr.io/db-exp/cinemaabysstest/monolith` |
+| `monolith.image.repository`    | Monolith image repository                       | `monolith` |
 | `monolith.image.tag`           | Monolith image tag                              | `latest`        |
-| `monolith.image.pullPolicy`    | Monolith image pull policy                      | `Always`        |
+| `monolith.image.pullPolicy`    | Monolith image pull policy                      | `IfNotPresent`        |
 | `monolith.replicas`            | Number of monolith replicas                     | `1`             |
 | `monolith.resources.limits.cpu`| Monolith CPU limit                              | `500m`          |
 | `monolith.resources.limits.memory` | Monolith memory limit                       | `512Mi`         |
@@ -77,9 +104,9 @@ helm uninstall cinemaabyss
 | Name                           | Description                                     | Value           |
 |--------------------------------|-------------------------------------------------|-----------------|
 | `proxyService.enabled`         | Enable proxy service deployment                 | `true`          |
-| `proxyService.image.repository`| Proxy service image repository                  | `ghcr.io/db-exp/cinemaabysstest/proxy-service` |
+| `proxyService.image.repository`| Proxy service image repository                  | `proxy-service` |
 | `proxyService.image.tag`       | Proxy service image tag                         | `latest`        |
-| `proxyService.image.pullPolicy`| Proxy service image pull policy                 | `Always`        |
+| `proxyService.image.pullPolicy`| Proxy service image pull policy                 | `IfNotPresent`        |
 | `proxyService.replicas`        | Number of proxy service replicas                | `1`             |
 | `proxyService.resources.limits.cpu`| Proxy service CPU limit                     | `300m`          |
 | `proxyService.resources.limits.memory` | Proxy service memory limit              | `256Mi`         |
@@ -94,9 +121,9 @@ helm uninstall cinemaabyss
 | Name                           | Description                                     | Value           |
 |--------------------------------|-------------------------------------------------|-----------------|
 | `moviesService.enabled`        | Enable movies service deployment                | `true`          |
-| `moviesService.image.repository`| Movies service image repository                | `ghcr.io/db-exp/cinemaabysstest/movies-service` |
+| `moviesService.image.repository`| Movies service image repository                | `movies-service` |
 | `moviesService.image.tag`      | Movies service image tag                        | `latest`        |
-| `moviesService.image.pullPolicy`| Movies service image pull policy               | `Always`        |
+| `moviesService.image.pullPolicy`| Movies service image pull policy               | `IfNotPresent`        |
 | `moviesService.replicas`       | Number of movies service replicas               | `1`             |
 | `moviesService.resources.limits.cpu`| Movies service CPU limit                   | `300m`          |
 | `moviesService.resources.limits.memory` | Movies service memory limit            | `256Mi`         |
@@ -111,9 +138,9 @@ helm uninstall cinemaabyss
 | Name                           | Description                                     | Value           |
 |--------------------------------|-------------------------------------------------|-----------------|
 | `eventsService.enabled`        | Enable events service deployment                | `true`          |
-| `eventsService.image.repository`| Events service image repository                | `ghcr.io/db-exp/cinemaabysstest/events-service` |
+| `eventsService.image.repository`| Events service image repository                | `events-service` |
 | `eventsService.image.tag`      | Events service image tag                        | `latest`        |
-| `eventsService.image.pullPolicy`| Events service image pull policy               | `Always`        |
+| `eventsService.image.pullPolicy`| Events service image pull policy               | `IfNotPresent`        |
 | `eventsService.replicas`       | Number of events service replicas               | `1`             |
 | `eventsService.resources.limits.cpu`| Events service CPU limit                   | `300m`          |
 | `eventsService.resources.limits.memory` | Events service memory limit            | `256Mi`         |

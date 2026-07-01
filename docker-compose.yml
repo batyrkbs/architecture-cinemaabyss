@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:14
     container_name: cinemaabyss-postgres
@@ -13,16 +10,15 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cinemaabyss"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
     networks:
       - cinemaabyss-network
 
-  # ZooKeeper for Kafka
   zookeeper:
     image: wurstmeister/zookeeper:latest
     container_name: cinemaabyss-zookeeper
@@ -31,7 +27,6 @@ services:
     networks:
       - cinemaabyss-network
 
-  # Kafka
   kafka:
     image: wurstmeister/kafka:2.13-2.7.0
     container_name: cinemaabyss-kafka
@@ -47,17 +42,22 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
     networks:
       - cinemaabyss-network
 
-  # Monolith Service
   monolith:
     build:
       context: ./src/monolith
       dockerfile: Dockerfile
     container_name: cinemaabyss-monolith
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
@@ -66,14 +66,14 @@ services:
     networks:
       - cinemaabyss-network
 
-  # Movies Microservice
   movies-service:
     build:
       context: ./src/microservices/movies
       dockerfile: Dockerfile
     container_name: cinemaabyss-movies-service
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8081:8081"
     environment:
@@ -82,15 +82,14 @@ services:
     networks:
       - cinemaabyss-network
 
-  # Events Microservice
   events-service:
     build:
       context: ./src/microservices/events
       dockerfile: Dockerfile
     container_name: cinemaabyss-events-service
     depends_on:
-      - postgres
-      - kafka
+      kafka:
+        condition: service_started
     ports:
       - "8082:8082"
     environment:
@@ -99,7 +98,6 @@ services:
     networks:
       - cinemaabyss-network
 
-  # Proxy Service (API Gateway)
   proxy-service:
     build:
       context: ./src/microservices/proxy
@@ -121,7 +119,6 @@ services:
     networks:
       - cinemaabyss-network
 
-  # Kafka UI for monitoring Kafka
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: cinemaabyss-kafka-ui
